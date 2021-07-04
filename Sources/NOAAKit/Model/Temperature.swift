@@ -8,7 +8,7 @@
 import Foundation
 
 /// Alias for the type that represents a temperature
-public typealias TemperatureDegrees = Float
+public typealias TemperatureDegrees = Int
 
 /// Temperature at a given time
 public struct Temperature: Codable {

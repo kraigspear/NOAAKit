@@ -8,5 +8,5 @@
 import Foundation
 
 public struct Weather: Codable {
-    public let current: CurrentConditions
+    public let currentConditions: CurrentConditions
 }

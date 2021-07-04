@@ -17,7 +17,7 @@ protocol CurrentConditionsExtractable {
     /**
      Extract `CurrentConditions` from a `CurrentObservation`
      */
-    func extract(_ currentObservation: NOAAModel.CurrentObservation) throws -> CurrentConditions
+    func extract(_ currentObservation: MAPClickResponse.CurrentObservation) throws -> CurrentConditions
 }
 
 final class CurrentConditionExtractor: CurrentConditionsExtractable {
@@ -29,9 +29,9 @@ final class CurrentConditionExtractor: CurrentConditionsExtractable {
     }
 
     /**
-     Extract `Current` from a `CurrentObservation`
+     Extract `CurrentConditions` from a `CurrentObservation`
      */
-    func extract(_ currentObservation: NOAAModel.CurrentObservation) throws -> CurrentConditions {
+    func extract(_ currentObservation: MAPClickResponse.CurrentObservation) throws -> CurrentConditions {
         guard let date = dateFormatter.date(from: currentObservation.date) else { throw CurrentConditionExtractorError.dateParseError }
 
         let temperature: Temperature
@@ -48,7 +48,7 @@ final class CurrentConditionExtractor: CurrentConditionsExtractable {
 
 }
 
-extension NOAAModel.CurrentObservation {
+extension MAPClickResponse.CurrentObservation {
     var temperature: Temperature {
         get throws {
             try Temperature(actual: actual, feelsLike: feelsLike)
@@ -60,7 +60,7 @@ extension NOAAModel.CurrentObservation {
             if let temperature = TemperatureDegrees(self.temp) {
                 return temperature
             }
-            throw NOAAModel.ParseError.parseError(field: "temp")
+            throw MAPClickResponse.ParseError.parseError(field: "temp")
         }
     }
 

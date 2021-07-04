@@ -13,6 +13,7 @@ import CoreLocation
 final class ContentViewModel: ObservableObject {
 
     @Published var temperature = ""
+    @Published var date = ""
 
     func reload() async {
 
@@ -25,7 +26,11 @@ final class ContentViewModel: ObservableObject {
 
         do {
             if let weather = try await noaa.fetchWeather(atCoordinate: coordinate).weather {
-                self.temperature = "\(weather.current.temperature.actual)"
+
+                let currentConditions = weather.currentConditions
+
+                self.temperature = "Actual: \(currentConditions.temperature.actual) / Feels: \(currentConditions.temperature.feelsLike)"
+                self.date = "\(currentConditions.date)"
             }
         } catch {
             print("Error: \(error)")

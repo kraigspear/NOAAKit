@@ -1,5 +1,5 @@
 //
-//  NOAACurrentConditionsModel.swift
+//  MAPClickResponse.swift
 //  
 //
 //  Created by Kraig Spear on 6/20/21.
@@ -12,13 +12,14 @@ import Foundation
 /// Model Class from
 
 /// Models coming from the NOAA API
-struct NOAAModel {
+/// These models will be transformed into a more coherent data model
+struct MAPClickResponse {
 
     enum ParseError: Error {
         case parseError(field: String)
     }
 
-    struct Forecast: Decodable {
+    struct Root: Decodable {
 
         enum CodingKeys: String, CodingKey {
             case currentObservation = "currentobservation"

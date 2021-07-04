@@ -9,18 +9,32 @@ import SwiftUI
 
 struct ContentView: View {
 
-    @ObservedObject var viewModel = ContentViewModel()
+    @ObservedObject private var viewModel = ContentViewModel()
 
     var body: some View {
         VStack {
-            Text(viewModel.temperature)
-                .padding()
+            DataEntryView(label: "Observed On:", data: viewModel.date)
+            DataEntryView(label: "Temperature:", data: viewModel.temperature)
+
         }.onAppear {
             async {
                 await viewModel.reload()
             }
         }
     }
+}
+
+private struct DataEntryView: View {
+    let label: String
+    let data: String
+
+    var body: some View {
+        HStack {
+            Text(label)
+            Text(data).padding()
+        }
+    }
+
 }
 
 struct ContentView_Previews: PreviewProvider {

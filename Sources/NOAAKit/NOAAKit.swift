@@ -16,37 +16,61 @@ public enum FetchError: Error {
 @available(macOS 12, *)
 @available(iOS 15, *)
 /**
-
+ Provides weather data from the National Weather Service
  */
 public class NOAA {
 
+    /// Handles converting the NOAA data model ``NOAAModel.CurrentObservation`` to a ``CurrentConditions``
     private let currentConditionsExtractor: CurrentConditionsExtractable
+    /// Fetches data from the NOAA MapClick API / Service
+    private let mapClickService: MapClickServiceFetching
 
+    /// Creates a new ``NOAA``
     public init() {
         self.currentConditionsExtractor = CurrentConditionExtractor()
+        self.mapClickService = MapClickService()
     }
 
-    init(currentConditionsExtractor: CurrentConditionsExtractable) {
+    /**
+     Creates a new ``NOAA`` with the extractors used to convert models
+     - parameters:
+       - currentConditionsExtractor: Handles converting the NOAA data model ``NOAAModel.CurrentObservation`` to a ``CurrentConditions``
+       - mapClickService: Fetches the response from the MapClick service
+     */
+    init(currentConditionsExtractor: CurrentConditionsExtractable,
+         mapClickService: MapClickServiceFetching) {
         self.currentConditionsExtractor = currentConditionsExtractor
+        self.mapClickService = mapClickService
     }
 
+    /**
+     Fetch the location with weather for the ``Coordinate`` that was passed in.
+
+     Calling this function will return the latest weather information for the given coordinate.
+     If there is a problem either with the network or parsing a ``FetchError`` is thrown.
+     
+     - parameter atCoordinate: The coordinate of the location to get weather
+     - Returns: A ``WeatherLocation`` containing the weather for this location
+     - Throws: ``FetchError`` If there was a problem retrieving the latest weather information from NOAA
+
+     ```swift
+     do {
+         if let weather = try await noaa.fetchWeather(atCoordinate: coordinate).weather {
+             self.temperature = "\(weather.current.temperature.actual)"
+         }
+     } catch {
+         print("Error: \(error)")
+     }
+     ```
+     */
     public func fetchWeather(atCoordinate coordinate: CLLocationCoordinate2D) async throws -> WeatherLocation {
 
-        let request = coordinate.currentObservationRequest
-        let (data, response) = try await URLSession.shared.data(for: request)
-        guard let httpURLResponse = response as? HTTPURLResponse else {
-             preconditionFailure("Unexpected to not receive a HTTPURLResponse")
+        func currentConditions() async throws -> CurrentConditions {
+            let mapClickResponse = try await mapClickService.fetch(atCoordinate: coordinate)
+            return try currentConditionsExtractor.extract(mapClickResponse.currentObservation)
         }
 
-        guard httpURLResponse.statusCode == 200 else { throw FetchError.statusCode(code: httpURLResponse.statusCode)}
-
-        guard let noaaForecast = try? JSONDecoder().decode(NOAAModel.Forecast.self, from: data) else {
-            throw FetchError.parseFailed
-        }
-
-        let current = try currentConditionsExtractor.extract(noaaForecast.currentObservation)
-
-        let weather = Weather(current: current)
+        let weather = Weather(currentConditions: try await currentConditions())
 
         return WeatherLocation(
             coordinate: Coordinate(coordinate),
@@ -55,12 +79,4 @@ public class NOAA {
     }
 }
 
-private extension CLLocationCoordinate2D {
-    var currentObservationRequest: URLRequest {
-        let urlStr = "https://forecast.weather.gov/MapClick.php?lat=\(latitude)&lon=\(longitude)&unit=0&lg=english&FcstType=json"
-        let url = URL(string: urlStr)!
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        return request
-    }
-}
+

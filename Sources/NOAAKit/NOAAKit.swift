@@ -2,55 +2,57 @@
 import Foundation
 import CoreLocation
 
+/// Error that can happen when fetching weather
 public enum FetchError: Error {
-    case badID
+    /// The status code indicated that the call was unsuccessful
+    /// - parameter code: The code other than 200 that was returned
+    case statusCode(code: Int)
+    /// Unable to parse the response. The code possibly makes incorrect assumptions about the data model
     case parseFailed
+    ///
     case conversion
 }
 
 @available(macOS 12, *)
 @available(iOS 15, *)
+/**
+
+ */
 public class NOAA {
 
-    public init() {}
+    private let currentConditionsExtractor: CurrentConditionsExtractable
 
-    public func fetchWeather(atCoordinate coordinate: CLLocationCoordinate2D) async throws -> Location {
+    public init() {
+        self.currentConditionsExtractor = CurrentConditionExtractor()
+    }
+
+    init(currentConditionsExtractor: CurrentConditionsExtractable) {
+        self.currentConditionsExtractor = currentConditionsExtractor
+    }
+
+    public func fetchWeather(atCoordinate coordinate: CLLocationCoordinate2D) async throws -> WeatherLocation {
 
         let request = coordinate.currentObservationRequest
         let (data, response) = try await URLSession.shared.data(for: request)
-        guard (response as? HTTPURLResponse)?.statusCode == 200 else { throw FetchError.badID }
+        guard let httpURLResponse = response as? HTTPURLResponse else {
+             preconditionFailure("Unexpected to not receive a HTTPURLResponse")
+        }
 
-        guard let noaaForecast = try? JSONDecoder().decode(NOAAForecast.self, from: data) else {
+        guard httpURLResponse.statusCode == 200 else { throw FetchError.statusCode(code: httpURLResponse.statusCode)}
+
+        guard let noaaForecast = try? JSONDecoder().decode(NOAAModel.Forecast.self, from: data) else {
             throw FetchError.parseFailed
         }
 
-        let weather = Weather(current: try noaaForecast.currentObservation.toCurrent())
+        let current = try currentConditionsExtractor.extract(noaaForecast.currentObservation)
 
-        return Location(
+        let weather = Weather(current: current)
+
+        return WeatherLocation(
             coordinate: Coordinate(coordinate),
             weather: weather)
 
     }
-
-    public func fetchTemperature(atCoordinate coordinate: CLLocationCoordinate2D) async throws -> Float {
-
-        let request = coordinate.currentObservationRequest
-
-        let (data, response) = try await URLSession.shared.data(for: request)
-
-        guard (response as? HTTPURLResponse)?.statusCode == 200 else { throw FetchError.badID }
-
-        guard let noaaForecast = try? JSONDecoder().decode(NOAAForecast.self, from: data) else {
-            throw FetchError.parseFailed
-        }
-
-        if let temperature = Float(noaaForecast.currentObservation.temp) {
-            return temperature
-        }
-
-        throw FetchError.conversion
-    }
-
 }
 
 private extension CLLocationCoordinate2D {

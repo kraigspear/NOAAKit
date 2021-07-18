@@ -1,5 +1,5 @@
 //
-//  Current.swift
+//  CurrentConditions.swift
 //  
 //
 //  Created by Kraig Spear on 6/28/21.
@@ -13,4 +13,10 @@ public struct CurrentConditions: Codable {
     public let date: Date
     /// The current temperature
     public let temperature: Temperature
+
+    public init(date: Date,
+                temperature: Temperature) {
+        self.date = date
+        self.temperature = temperature
+    }
 }

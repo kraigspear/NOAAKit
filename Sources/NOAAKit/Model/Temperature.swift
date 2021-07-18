@@ -16,4 +16,16 @@ public struct Temperature: Codable {
     public let actual: TemperatureDegrees
     /// What it feels like
     public let feelsLike: TemperatureDegrees
+
+    public init(actual: TemperatureDegrees,
+                feelsLike: TemperatureDegrees) {
+        self.actual = actual
+        self.feelsLike = feelsLike
+    }
+}
+
+public extension TemperatureDegrees {
+    var formatted: String {
+        TemperatureFormatter().format(self)
+    }
 }

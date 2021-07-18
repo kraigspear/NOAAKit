@@ -8,39 +8,32 @@ public enum FetchError: Error {
     /// - parameter code: The code other than 200 that was returned
     case statusCode(code: Int)
     /// Unable to parse the response. The code possibly makes incorrect assumptions about the data model
-    case parseFailed
-    ///
+    case parseFailed(field: String)
+    /// Failed to convert data to the expected type
     case conversion
+    /// The Station ID is needed for current conditions. Possible invalid coordinates
+    case stationIdentifierNotFound
+    /// The data can't be converted into JSON
+    case dataIsNotJSON
+    case responseIsNotHTTP
 }
 
 @available(macOS 12, *)
 @available(iOS 15, *)
+
+public protocol NOAAFetching {
+    func fetchWeather(atCoordinate coordinate: CLLocationCoordinate2D) async throws -> WeatherLocation
+}
+
 /**
  Provides weather data from the National Weather Service
  */
-public class NOAA {
+public class NOAA: NOAAFetching {
 
-    /// Handles converting the NOAA data model ``NOAAModel.CurrentObservation`` to a ``CurrentConditions``
-    private let currentConditionsExtractor: CurrentConditionsExtractable
-    /// Fetches data from the NOAA MapClick API / Service
-    private let mapClickService: MapClickServiceFetching
+    private let dateFormatter = ISO8601DateFormatter()
 
     /// Creates a new ``NOAA``
     public init() {
-        self.currentConditionsExtractor = CurrentConditionExtractor()
-        self.mapClickService = MapClickService()
-    }
-
-    /**
-     Creates a new ``NOAA`` with the extractors used to convert models
-     - parameters:
-       - currentConditionsExtractor: Handles converting the NOAA data model ``NOAAModel.CurrentObservation`` to a ``CurrentConditions``
-       - mapClickService: Fetches the response from the MapClick service
-     */
-    init(currentConditionsExtractor: CurrentConditionsExtractable,
-         mapClickService: MapClickServiceFetching) {
-        self.currentConditionsExtractor = currentConditionsExtractor
-        self.mapClickService = mapClickService
     }
 
     /**
@@ -64,10 +57,66 @@ public class NOAA {
      ```
      */
     public func fetchWeather(atCoordinate coordinate: CLLocationCoordinate2D) async throws -> WeatherLocation {
+        let noaaURLS = try await coordinate.fetchPoints()
+
+        func fetchStationIdentifier() async throws -> String {
+
+            let observationStationElement = "observationStations"
+            let stationIdentifierElement = "stationIdentifier"
+            let featuresElement = "features"
+            let propertyElement = "properties"
+
+            guard let stationsURL = URL(string: noaaURLS.observationStations) else {
+                throw FetchError.parseFailed(field: observationStationElement)
+            }
+
+            var stationRequest = URLRequest(url: stationsURL)
+            stationRequest.addStandardHeaders()
+            let stationJSON = try await stationRequest.fetchJSON()
+
+            guard let features = stationJSON[featuresElement] as? [JSON] else {
+                throw FetchError.parseFailed(field: featuresElement)
+            }
+
+            if let firstFeature = features.first {
+                if let properties = firstFeature[propertyElement] as? JSON {
+                    if let stationIdentifier = properties[stationIdentifierElement] as? String {
+                        return stationIdentifier
+                    }
+                }
+            }
+
+            throw FetchError.stationIdentifierNotFound
+        }
 
         func currentConditions() async throws -> CurrentConditions {
-            let mapClickResponse = try await mapClickService.fetch(atCoordinate: coordinate)
-            return try currentConditionsExtractor.extract(mapClickResponse.currentObservation)
+
+            let stationIdentifier = try await fetchStationIdentifier()
+
+            let observationURL = URL(string: "https://api.weather.gov/stations/\(stationIdentifier)/observations/latest")!
+            var observationRequest = URLRequest(url: observationURL)
+            observationRequest.addStandardHeaders()
+
+            let json = try await observationRequest.fetchJSON()
+
+            guard let propertyNode = json["properties"] as? JSON else {
+                throw FetchError.parseFailed(field: "properties")
+            }
+
+            guard let temperatureNode = propertyNode["temperature"] as? JSON else {
+                throw FetchError.parseFailed(field: "temperature")
+            }
+
+            guard let temperatureValue = temperatureNode["value"] as? Double else {
+                throw FetchError.parseFailed(field: "value")
+            }
+
+            let actual = Int(Measurement(value: temperatureValue, unit: UnitTemperature.celsius).converted(to: .fahrenheit).value)
+            let temperature = Temperature(actual: actual, feelsLike: actual)
+
+            let date = try parseDate(propertyNode, name: "timestamp")
+
+            return CurrentConditions(date: date, temperature: temperature)
         }
 
         let weather = Weather(currentConditions: try await currentConditions())
@@ -75,7 +124,32 @@ public class NOAA {
         return WeatherLocation(
             coordinate: Coordinate(coordinate),
             weather: weather)
+    }
 
+    private func parseDate(_ json: JSON, name: String) throws -> Date {
+        guard let dateStr = json[name] as? String else {
+            throw FetchError.parseFailed(field: name)
+        }
+        if let date = dateFormatter.date(from: dateStr) {
+            return date
+        }
+        throw FetchError.parseFailed(field: name)
+    }
+}
+
+private extension CLLocationCoordinate2D {
+    func fetchPoints() async throws -> NOAAURLS {
+        let json = try await pointsRequest.fetchJSON()
+
+        guard let properties = json["properties"] as? JSON else {
+            throw FetchError.parseFailed(field: "properties")
+        }
+
+        if let observationStations = properties["observationStations"] as? String {
+            return NOAAURLS(observationStations: observationStations)
+        }
+
+        throw FetchError.parseFailed(field: "observationStations")
     }
 }
 

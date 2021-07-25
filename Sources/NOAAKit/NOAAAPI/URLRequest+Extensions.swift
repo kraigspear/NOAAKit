@@ -7,7 +7,7 @@
 
 import Foundation
 
-typealias JSON = [String: Any]
+
 
 extension URLRequest {
     /**

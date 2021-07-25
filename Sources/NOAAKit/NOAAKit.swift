@@ -59,82 +59,21 @@ public class NOAA: NOAAFetching {
     public func fetchWeather(atCoordinate coordinate: CLLocationCoordinate2D) async throws -> WeatherLocation {
         let noaaURLS = try await coordinate.fetchPoints()
 
-        func fetchStationIdentifier() async throws -> String {
-
-            let observationStationElement = "observationStations"
-            let stationIdentifierElement = "stationIdentifier"
-            let featuresElement = "features"
-            let propertyElement = "properties"
-
-            guard let stationsURL = URL(string: noaaURLS.observationStations) else {
-                throw FetchError.parseFailed(field: observationStationElement)
-            }
-
-            var stationRequest = URLRequest(url: stationsURL)
-            stationRequest.addStandardHeaders()
-            let stationJSON = try await stationRequest.fetchJSON()
-
-            guard let features = stationJSON[featuresElement] as? [JSON] else {
-                throw FetchError.parseFailed(field: featuresElement)
-            }
-
-            if let firstFeature = features.first {
-                if let properties = firstFeature[propertyElement] as? JSON {
-                    if let stationIdentifier = properties[stationIdentifierElement] as? String {
-                        return stationIdentifier
-                    }
-                }
-            }
-
-            throw FetchError.stationIdentifierNotFound
+        guard let observationURL = URL(string: noaaURLS.observationStations) else {
+            throw FetchError.parseFailed(field: "observationStations")
         }
 
-        func currentConditions() async throws -> CurrentConditions {
+        let currentConditions = try await CurrentConditionExtractor(observationStationURL: observationURL).extract()
 
-            let stationIdentifier = try await fetchStationIdentifier()
-
-            let observationURL = URL(string: "https://api.weather.gov/stations/\(stationIdentifier)/observations/latest")!
-            var observationRequest = URLRequest(url: observationURL)
-            observationRequest.addStandardHeaders()
-
-            let json = try await observationRequest.fetchJSON()
-
-            guard let propertyNode = json["properties"] as? JSON else {
-                throw FetchError.parseFailed(field: "properties")
-            }
-
-            guard let temperatureNode = propertyNode["temperature"] as? JSON else {
-                throw FetchError.parseFailed(field: "temperature")
-            }
-
-            guard let temperatureValue = temperatureNode["value"] as? Double else {
-                throw FetchError.parseFailed(field: "value")
-            }
-
-            let actual = Int(Measurement(value: temperatureValue, unit: UnitTemperature.celsius).converted(to: .fahrenheit).value)
-            let temperature = Temperature(actual: actual, feelsLike: actual)
-
-            let date = try parseDate(propertyNode, name: "timestamp")
-
-            return CurrentConditions(date: date, temperature: temperature)
-        }
-
-        let weather = Weather(currentConditions: try await currentConditions())
+        let weather = Weather(currentConditions: currentConditions)
 
         return WeatherLocation(
             coordinate: Coordinate(coordinate),
             weather: weather)
     }
 
-    private func parseDate(_ json: JSON, name: String) throws -> Date {
-        guard let dateStr = json[name] as? String else {
-            throw FetchError.parseFailed(field: name)
-        }
-        if let date = dateFormatter.date(from: dateStr) {
-            return date
-        }
-        throw FetchError.parseFailed(field: name)
-    }
+
+
 }
 
 private extension CLLocationCoordinate2D {

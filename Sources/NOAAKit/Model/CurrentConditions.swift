@@ -14,9 +14,15 @@ public struct CurrentConditions: Codable {
     /// The current temperature
     public let temperature: Temperature
 
+    /// Percentage of cloud cover.
+    /// 100 = completely overcast
+    public let clouds: Int
+
     public init(date: Date,
-                temperature: Temperature) {
+                temperature: Temperature,
+                clouds: Int) {
         self.date = date
         self.temperature = temperature
+        self.clouds = clouds
     }
 }

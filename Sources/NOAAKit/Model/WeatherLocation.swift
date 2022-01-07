@@ -9,7 +9,7 @@ import Foundation
 import CoreLocation
 
 /// A location that has weather information
-public struct WeatherLocation: Codable {
+public struct WeatherLocation {
     /// The `coordinate` of the location containing weather
     public let coordinate: Coordinate
     /// Weather at this `WeatherLocation`

@@ -7,10 +7,10 @@
 
 import Foundation
 
-public struct Weather: Codable {
-    public let currentConditions: CurrentConditions
+public struct Weather {
+    public let observations: Observation
 
-    public init(currentConditions: CurrentConditions) {
-        self.currentConditions = currentConditions
+    public init(observations: Observation) {
+        self.observations = observations
     }
 }

@@ -8,17 +8,17 @@
 import Foundation
 
 /// Alias for the type that represents a temperature
-public typealias TemperatureDegrees = Int
+public typealias TemperatureDegrees = Double
 
 /// Temperature at a given time
 public struct Temperature: Codable {
     /// The actual air temperature
     public let actual: TemperatureDegrees
     /// What it feels like
-    public let feelsLike: TemperatureDegrees
+    public let feelsLike: TemperatureDegrees?
 
     public init(actual: TemperatureDegrees,
-                feelsLike: TemperatureDegrees) {
+                feelsLike: TemperatureDegrees?) {
         self.actual = actual
         self.feelsLike = feelsLike
     }

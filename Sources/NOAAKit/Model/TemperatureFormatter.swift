@@ -45,8 +45,8 @@ public final class TemperatureFormatter: TemperatureFormatting {
             return temperature
         }
 
-        let convertedMeasurement = Measurement(value: Double(temperature), unit: UnitTemperature.fahrenheit).converted(to: .celsius)
+        let convertedMeasurement = Measurement(value: temperature, unit: UnitTemperature.fahrenheit).converted(to: .celsius)
 
-        return Int(convertedMeasurement.value)
+        return convertedMeasurement.value
     }
 }

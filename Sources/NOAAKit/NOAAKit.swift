@@ -1,6 +1,7 @@
 
 import Foundation
 import CoreLocation
+import os
 
 /// Error that can happen when fetching weather
 public enum FetchError: Error {
@@ -31,10 +32,10 @@ public protocol NOAAFetching {
 public class NOAA: NOAAFetching {
 
     private let dateFormatter = ISO8601DateFormatter()
+    private let log = LogContext.noaaKit.logger
 
     /// Creates a new ``NOAA``
-    public init() {
-    }
+    public init() {}
 
     /**
      Fetch the location with weather for the ``Coordinate`` that was passed in.
@@ -57,23 +58,28 @@ public class NOAA: NOAAFetching {
      ```
      */
     public func fetchWeather(atCoordinate coordinate: CLLocationCoordinate2D) async throws -> WeatherLocation {
+        log.debug("fetchPoints")
         let noaaURLS = try await coordinate.fetchPoints()
+        log.debug("Points fetched")
 
         guard let observationURL = URL(string: noaaURLS.observationStations) else {
+            log.error("parseFailed: observationStations")
             throw FetchError.parseFailed(field: "observationStations")
         }
 
-        let currentConditions = try await CurrentConditionExtractor(observationStationURL: observationURL).extract()
+        log.debug("observationURL: \(observationURL.absoluteString)")
+        log.debug("Extracting observations")
 
-        let weather = Weather(currentConditions: currentConditions)
+        let observations = try await ObservationsExtractor(observationStationURL: observationURL).extract()
+
+        log.debug("observations extracted")
+
+        let weather = Weather(observations: observations)
 
         return WeatherLocation(
             coordinate: Coordinate(coordinate),
             weather: weather)
     }
-
-
-
 }
 
 private extension CLLocationCoordinate2D {

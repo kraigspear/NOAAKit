@@ -1,12 +1,12 @@
 //
 //  WeatherLocation.swift
-//  
+//
 //
 //  Created by Kraig Spear on 6/28/21.
 //
 
-import Foundation
 import CoreLocation
+import Foundation
 
 /// A location that has weather information
 public struct WeatherLocation {

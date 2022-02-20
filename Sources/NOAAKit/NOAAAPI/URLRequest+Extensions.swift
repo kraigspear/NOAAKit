@@ -7,8 +7,6 @@
 
 import Foundation
 
-
-
 extension URLRequest {
     /**
      Fetch Data from web expecting a HTTPURLResponse
@@ -19,8 +17,8 @@ extension URLRequest {
         guard let httpURLResponse = response as? HTTPURLResponse else {
             preconditionFailure("Expected HTTPURLResponse")
         }
-        guard httpURLResponse.statusCode == 200 else { throw FetchError.statusCode(code: httpURLResponse.statusCode)}
-        print("Data Fetched for \(String(describing: self.url))")
+        guard httpURLResponse.statusCode == 200 else { throw FetchError.statusCode(code: httpURLResponse.statusCode) }
+        print("Data Fetched for \(String(describing: url))")
         return data
     }
 
@@ -31,7 +29,7 @@ extension URLRequest {
             preconditionFailure("Data is not JSON")
         }
 
-        print("Data Fetched for url: \(String(describing: self.url)) json: \(json)")
+        print("Data Fetched for url: \(String(describing: url)) json: \(json)")
 
         return json
     }

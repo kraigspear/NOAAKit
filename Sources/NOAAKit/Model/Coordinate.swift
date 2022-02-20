@@ -5,8 +5,8 @@
 //  Created by Kraig Spear on 8/21/20.
 //
 
-import Foundation
 import CoreLocation
+import Foundation
 
 /**
  Allows storing a coordinate outside of CoreLocation CLCoordinate2D which doesn't support
@@ -44,6 +44,7 @@ public struct Coordinate: Codable, Equatable, Hashable, CustomStringConvertible 
     }
 
     // MARK: - CustomStringConvertible
+
     public var description: String {
         "Lat: \(latitude) Lng: \(longitude)"
     }

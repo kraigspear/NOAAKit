@@ -13,7 +13,6 @@ import SwiftUI
  Extract out current condition from JSON
  */
 struct ObservationsExtractor {
-
     private let observationStationURL: URL
     private let log = LogContext.observationsExtractor.logger
 
@@ -42,14 +41,14 @@ struct ObservationsExtractor {
 
         let properties = try json.json("properties")
 
-        var temperature: Double {
+        var temperature: TemperatureDegrees {
             get throws {
-                let temperatureNode = try properties.json("temperature")
-                let temperatureCelsius = try Double(temperatureNode.float("value"))
-                return Measurement(value: temperatureCelsius,
-                                                        unit: UnitTemperature.celsius)
-                    .converted(to: UnitTemperature.fahrenheit)
-                    .value
+                if let temperature = try properties.extractTemperatureNamed("temperature") {
+                    return temperature
+                } else {
+                    assertionFailure("temperature is required")
+                    throw ExtractError.nilFound(fieldName: "temperature")
+                }
             }
         }
 
@@ -66,12 +65,27 @@ struct ObservationsExtractor {
             }
         }
 
-        return Observation(temperature: try temperature,
-                           timestamp: try timeStamp)
+        var windChill: TemperatureDegrees? {
+            get throws {
+                try properties.extractTemperatureNamed("windChill")
+            }
+        }
+
+        var heatIndex: TemperatureDegrees? {
+            get throws {
+                try properties.extractTemperatureNamed("heatIndex")
+            }
+        }
+
+        return Observation(timestamp: try timeStamp,
+                           temperature: try temperature,
+                           windChill: try windChill,
+                           heatIndex: try heatIndex)
     }
 
-    private func fetchStationIdentifier() async throws -> String {
 
+
+    private func fetchStationIdentifier() async throws -> String {
         let stationIdentifierElement = "stationIdentifier"
         let featuresElement = "features"
         let propertyElement = "properties"
@@ -93,5 +107,25 @@ struct ObservationsExtractor {
         }
 
         throw FetchError.stationIdentifierNotFound
+    }
+}
+
+private extension JSON {
+    /**
+     Extract a temperature from a temperature node.
+     Not all temperate nodes are required such as windChill & HeatIndex
+     So the return value is optional
+
+     - parameter named: Name of the node to extract
+     - returns: Temperature value or nil if the value was not provided
+     - throws ExtractError.notFound: If the node was not found
+     */
+    func extractTemperatureNamed(_ named: String) throws -> TemperatureDegrees? {
+        let temperatureNode = try json(named)
+        do {
+            return try TemperatureDegrees(temperatureNode.float("value"))
+        } catch {
+            return nil
+        }
     }
 }

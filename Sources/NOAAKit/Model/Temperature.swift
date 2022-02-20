@@ -1,6 +1,6 @@
 //
 //  Temperature.swift
-//  
+//
 //
 //  Created by Kraig Spear on 6/28/21.
 //

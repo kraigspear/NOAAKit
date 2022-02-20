@@ -7,7 +7,7 @@
 
 import Foundation
 
-private struct DateFormatters {
+private enum DateFormatters {
     static let iso8601 = ISO8601DateFormatter()
 }
 
@@ -32,9 +32,7 @@ extension JSON {
     }
 
     func extractValue<Value: SignedNumeric>(name: String) throws -> Value? {
-        let extractedJson = try self.extractJSON(name: name)
+        let extractedJson = try extractJSON(name: name)
         return extractedJson["value"] as? Value
     }
-
 }
-

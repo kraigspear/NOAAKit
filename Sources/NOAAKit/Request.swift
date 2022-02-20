@@ -5,8 +5,8 @@
 //  Created by Kraig Spear on 7/18/21.
 //
 
-import Foundation
 import CoreLocation
+import Foundation
 
 extension CLLocationCoordinate2D {
     var pointsRequest: URLRequest {

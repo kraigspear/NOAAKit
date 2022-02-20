@@ -1,6 +1,6 @@
 //
 //  TemperatureFormatter.swift
-//  
+//
 //
 //  Created by Kraig Spear on 7/14/21.
 //
@@ -21,7 +21,6 @@ public protocol TemperatureFormatting {
  Formats a temperature based on the system it's running on
  */
 public final class TemperatureFormatter: TemperatureFormatting {
-
     /// Should the temperature be formatted with metric or standard
     private let usesMetricSystem: Bool
 
@@ -41,11 +40,12 @@ public final class TemperatureFormatter: TemperatureFormatting {
     }
 
     private func convertTemperature(_ temperature: TemperatureDegrees) -> TemperatureDegrees {
-        guard usesMetricSystem else {
+
+        if usesMetricSystem {
             return temperature
         }
 
-        let convertedMeasurement = Measurement(value: temperature, unit: UnitTemperature.fahrenheit).converted(to: .celsius)
+        let convertedMeasurement = Measurement(value: temperature, unit: UnitTemperature.celsius).converted(to: .fahrenheit)
 
         return convertedMeasurement.value
     }

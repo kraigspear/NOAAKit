@@ -1,6 +1,6 @@
 
-import Foundation
 import CoreLocation
+import Foundation
 import os
 
 /// Error that can happen when fetching weather
@@ -23,14 +23,13 @@ public enum FetchError: Error {
 @available(iOS 15, *)
 
 public protocol NOAAFetching {
-    func fetchWeather(atCoordinate coordinate: CLLocationCoordinate2D) async throws -> WeatherLocation
+    func fetchWeather(atCoordinate coordinate: CLLocationCoordinate2D) async throws -> Weather
 }
 
 /**
  Provides weather data from the National Weather Service
  */
 public class NOAA: NOAAFetching {
-
     private let dateFormatter = ISO8601DateFormatter()
     private let log = LogContext.noaaKit.logger
 
@@ -42,7 +41,7 @@ public class NOAA: NOAAFetching {
 
      Calling this function will return the latest weather information for the given coordinate.
      If there is a problem either with the network or parsing a ``FetchError`` is thrown.
-     
+
      - parameter atCoordinate: The coordinate of the location to get weather
      - Returns: A ``WeatherLocation`` containing the weather for this location
      - Throws: ``FetchError`` If there was a problem retrieving the latest weather information from NOAA
@@ -57,7 +56,7 @@ public class NOAA: NOAAFetching {
      }
      ```
      */
-    public func fetchWeather(atCoordinate coordinate: CLLocationCoordinate2D) async throws -> WeatherLocation {
+    public func fetchWeather(atCoordinate coordinate: CLLocationCoordinate2D) async throws -> Weather {
         log.debug("fetchPoints")
         let noaaURLS = try await coordinate.fetchPoints()
         log.debug("Points fetched")
@@ -74,11 +73,7 @@ public class NOAA: NOAAFetching {
 
         log.debug("observations extracted")
 
-        let weather = Weather(observations: observations)
-
-        return WeatherLocation(
-            coordinate: Coordinate(coordinate),
-            weather: weather)
+        return Weather(observations: observations)
     }
 }
 
@@ -97,5 +92,3 @@ private extension CLLocationCoordinate2D {
         throw FetchError.parseFailed(field: "observationStations")
     }
 }
-
-

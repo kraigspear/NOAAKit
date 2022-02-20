@@ -1,5 +1,5 @@
-import XCTest
 @testable import NOAAKit
+import XCTest
 
 import CoreLocation
 
@@ -15,7 +15,5 @@ final class NOAAKitTests: XCTestCase {
 //                                              longitude: -85.5167)
 //
 //        let locationWeather = try await noaa.fetchWeather(atCoordinate: location)
-
-
     }
 }

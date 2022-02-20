@@ -1,6 +1,6 @@
 //
 //  LogContext.swift
-//  
+//
 //
 //  Created by Kraig Spear on 1/7/22.
 //
@@ -16,5 +16,3 @@ enum LogContext: String {
         os.Logger(subsystem: "com.spearware.NOAAKit", category: rawValue)
     }
 }
-
-

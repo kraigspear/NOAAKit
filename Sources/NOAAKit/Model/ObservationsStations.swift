@@ -6,6 +6,7 @@
 import Foundation
 
 // MARK: - StationsObservationsStations
+
 struct StationsObservationsStations {
     let context: [StationsContextElement]
     let type: String
@@ -19,6 +20,7 @@ enum StationsContextElement {
 }
 
 // MARK: - StationsContextClass
+
 struct StationsContextClass {
     let version: String
     let wx, s: String
@@ -35,26 +37,31 @@ struct StationsContextClass {
 }
 
 // MARK: - StationsBearing
+
 struct StationsBearing {
     let type: String
 }
 
 // MARK: - StationsDistance
+
 struct StationsDistance {
     let id, type: String
 }
 
 // MARK: - StationsObservationStations
+
 struct StationsObservationStations {
     let container, type: String
 }
 
 // MARK: - StationsValue
+
 struct StationsValue {
     let id: String
 }
 
 // MARK: - StationsFeature
+
 struct StationsFeature {
     let id: String
     let type: StationsFeatureType
@@ -63,6 +70,7 @@ struct StationsFeature {
 }
 
 // MARK: - StationsGeometry
+
 struct StationsGeometry {
     let type: StationsGeometryType
     let coordinates: [Double]
@@ -73,6 +81,7 @@ enum StationsGeometryType {
 }
 
 // MARK: - StationsProperties
+
 struct StationsProperties {
     let id: String
     let type: StationsType
@@ -83,6 +92,7 @@ struct StationsProperties {
 }
 
 // MARK: - StationsElevation
+
 struct StationsElevation {
     let value: Double
     let unitCode: StationsUnitCode

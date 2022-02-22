@@ -30,9 +30,4 @@ extension JSON {
         }
         throw FetchError.parseFailed(field: name)
     }
-
-    func extractValue<Value: SignedNumeric>(name: String) throws -> Value? {
-        let extractedJson = try extractJSON(name: name)
-        return extractedJson["value"] as? Value
-    }
 }

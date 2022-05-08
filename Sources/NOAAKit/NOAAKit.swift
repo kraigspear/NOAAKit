@@ -22,7 +22,13 @@ public enum FetchError: Error {
 @available(macOS 12, *)
 @available(iOS 15, *)
 
+/// Fetch weather at a given location
 public protocol NOAAFetching {
+    /**
+     Fetch weather for a given coordinate
+     - parameter atCoordinate: The coordinate to get weather for
+     - returns: Weather for the given location
+     */
     func fetchWeather(atCoordinate coordinate: CLLocationCoordinate2D) async throws -> Weather
 }
 

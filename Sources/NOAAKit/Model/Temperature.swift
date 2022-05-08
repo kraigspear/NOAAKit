@@ -23,9 +23,3 @@ public struct Temperature: Codable {
         self.feelsLike = feelsLike
     }
 }
-
-public extension TemperatureDegrees {
-    var formatted: String {
-        TemperatureFormatter().format(self)
-    }
-}

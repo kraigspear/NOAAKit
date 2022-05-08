@@ -23,4 +23,8 @@ public struct Observation {
     public let wind: Wind
     /// Barometric Pressure at the observed time
     public let barometricPressure: Int
+    /// The visibility at the observed time
+    public let visibility: Int
+    /// Precent of relative humidity
+    public let relativeHumidity: Int?
 }

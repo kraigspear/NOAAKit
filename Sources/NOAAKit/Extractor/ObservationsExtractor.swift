@@ -16,6 +16,8 @@ enum PropertyField: String {
     case windSpeed
     case windGust
     case barometricPressure
+    case visibility
+    case relativeHumidity
     enum Temperature: String {
         case temperature
         case windChill
@@ -105,6 +107,7 @@ struct ObservationsExtractor {
 
         var temperature: TemperatureDegrees {
             get throws {
+                log.debug("Extract Temperature")
                 if let temperature = try propertyNode.extractTemperatureNamed(.temperature) {
                     return temperature
                 } else {
@@ -116,6 +119,7 @@ struct ObservationsExtractor {
 
         var timeStamp: Date {
             get throws {
+                log.debug("Extract timestamp")
                 let fieldName = "timestamp"
                 let timeStampStr = try propertyNode.string(PropertyField.timestamp.rawValue)
                 let dateformatter = DateFormatter()
@@ -129,13 +133,15 @@ struct ObservationsExtractor {
 
         var windChill: TemperatureDegrees? {
             get throws {
-                try propertyNode.extractTemperatureNamed(.windChill)
+                log.debug("Extract windChill")
+                return try propertyNode.extractTemperatureNamed(.windChill)
             }
         }
 
         var heatIndex: TemperatureDegrees? {
             get throws {
-                try propertyNode.extractTemperatureNamed(.heatIndex)
+                log.debug("extract heatIndex")
+                return try propertyNode.extractTemperatureNamed(.heatIndex)
             }
         }
 
@@ -199,6 +205,7 @@ struct ObservationsExtractor {
 
         func extractTemperature(_ propertyField: PropertyField.Temperature) throws -> TemperatureDegrees? {
 
+            log.debug("extractTemperature field: \(propertyField.rawValue)")
             if let value = try propertyNode.extractTemperatureNamed(propertyField) {
                 return value
             }
@@ -217,7 +224,9 @@ struct ObservationsExtractor {
                            textDescription: try extractString(.textDescription),
                            dewPoint: try extractTemperature(.dewpoint)!,
                            wind: wind,
-                           barometricPressure: try extractIntValue(.barometricPressure))
+                           barometricPressure: try extractIntValue(.barometricPressure),
+                           visibility: try extractIntValue(.visibility),
+                           relativeHumidity: try extractIntValue(.relativeHumidity))
 
     }
 

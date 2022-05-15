@@ -5,6 +5,8 @@ import Foundation
 
 /**
  Model for https://api.weather.gov/stations/KGRR/observations/latest
+
+ Observation of weather at a given weather station
  */
 public struct Observation {
     /// Date/Time when observation was observed
@@ -27,4 +29,6 @@ public struct Observation {
     public let visibility: Int
     /// Precent of relative humidity
     public let relativeHumidity: Int?
+    /// Clouds at various layers being observed
+    public let cloudLayers: [CloudLayer]
 }

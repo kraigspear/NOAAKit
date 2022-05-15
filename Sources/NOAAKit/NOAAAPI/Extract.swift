@@ -1,6 +1,5 @@
 //
 //  CurrentConditionExtractor.swift
-//  File
 //
 //  Created by Kraig Spear on 7/25/21.
 //
@@ -9,102 +8,24 @@ import Foundation
 import SpearFoundation
 import SwiftUI
 
-enum PropertyField: String {
-    case timestamp
-    case textDescription
-    case windDirection
-    case windSpeed
-    case windGust
-    case barometricPressure
-    case visibility
-    case relativeHumidity
-    enum Temperature: String {
-        case temperature
-        case windChill
-        case heatIndex
-        case dewpoint
-        var required: Bool {
-            switch self {
-            case .temperature, .dewpoint:
-                return true
-            default:
-                return false
-            }
-        }
-    }
-
-    var required: Bool {
-        switch self {
-        case .windGust:
-            return false
-        default:
-            return true
-        }
-    }
-}
-
 /**
- Extract out current condition from JSON
+ Extract out a DataModel from JSON
  */
-struct ObservationsExtractor {
-    private let observationStationURL: URL
-    private let log = LogContext.observationsExtractor.logger
+struct Extract {
 
-    init(observationStationURL: URL) {
-        self.observationStationURL = observationStationURL
-    }
+    //MARK: - Observation
 
-    func extract() async throws -> Observation {
+    /**
+     Extract an `Observation` from the given station URL
+     - parameter from: The URL for an Observation Station
+     - throws `FetchError.parseFailed`: The data could not be parsed
+     */
+    static func observation(from json: JSON) async throws -> Observation {
 
-        let log = self.log
-
-        func fetchObservationJSON() async throws -> JSON {
-
-            func observationRequest() async throws -> URLRequest {
-
-                func fetchStationIdentifier() async throws -> String {
-                    let stationIdentifierElement = "stationIdentifier"
-                    let featuresElement = "features"
-                    let propertyElement = "properties"
-
-                    var stationRequest = URLRequest(url: observationStationURL)
-                    stationRequest.addStandardHeaders()
-                    let stationJSON = try await stationRequest.fetchJSON()
-
-                    guard let features = stationJSON[featuresElement] as? [JSON] else {
-                        throw FetchError.parseFailed(field: featuresElement)
-                    }
-
-                    if let firstFeature = features.first {
-                        if let properties = firstFeature[propertyElement] as? JSON {
-                            if let stationIdentifier = properties[stationIdentifierElement] as? String {
-                                return stationIdentifier
-                            }
-                        }
-                    }
-
-                    throw FetchError.stationIdentifierNotFound
-                }
-
-                let stationIdentifier = try await fetchStationIdentifier()
-                let observationURL = URL(string: "https://api.weather.gov/stations/\(stationIdentifier)/observations/latest")!
-                log.debug("observationURL: \(observationURL)")
-                var observationRequest = URLRequest(url: observationURL)
-                observationRequest.addStandardHeaders()
-                return observationRequest
-            }
-
-            let request = try await observationRequest()
-            log.debug("Fetching Observation data")
-            let json = try await URLSession.shared.loadJSON(from: request)
-            log.debug("Observation data fetched")
-            return json
-        }
-
-        let json = try await fetchObservationJSON()
-
+        let log = LogContext.observationsExtractor.logger
         let propertyNode = try json.json("properties")
 
+        // Parse Fields
         var temperature: TemperatureDegrees {
             get throws {
                 log.debug("Extract Temperature")
@@ -163,7 +84,7 @@ struct ObservationsExtractor {
 
                 do {
                     log.debug("WindDirection")
-                    direction = try extractIntValue(.windDirection)
+                    direction = try propertyNode.extractIntValue(.windDirection)
                 } catch {
                     log.warning("Wind direction missing: \(error.localizedDescription)")
                     direction = 0
@@ -171,15 +92,15 @@ struct ObservationsExtractor {
 
                 do {
                     log.debug("WindSpeed")
-                    speed = try extractFloatValue(.windSpeed)
+                    speed = try propertyNode.extractFloatValue(.windSpeed)
                 } catch {
                     log.warning("Wind speed missing: \(error.localizedDescription)")
                     speed = 0.0
-               }
+                }
 
                 do {
                     log.debug("WindGust")
-                    gust = try extractFloatValue(.windGust)
+                    gust = try propertyNode.extractFloatValue(.windGust)
                 } catch {
                     log.debug("Wind gust missing: \(error.localizedDescription)")
                     gust = nil
@@ -191,16 +112,20 @@ struct ObservationsExtractor {
             }
         }
 
-        func extractIntValue(_ field: PropertyField) throws -> Int {
-            return try propertyNode.extractValue(field.rawValue)
-        }
-
-        func extractFloatValue(_ field: PropertyField) throws -> Float {
-            return try propertyNode.extractValue(field.rawValue)
-        }
-
-        func extractString(_ propertyField: PropertyField) throws -> String {
-            try propertyNode.string(propertyField.rawValue)
+        var cloudLayers: [CloudLayer] {
+            get throws {
+                let cloudNodes = try propertyNode.jsonArray(PropertyField.cloudLayers.rawValue)
+                return try cloudNodes.map {
+                    let stringAmount = try $0.string("amount")
+                    log.debug("CloudAmount: \(stringAmount)")
+                    if let cloudAmount = CloudAmount(rawValue: stringAmount) {
+                        return CloudLayer(cloudAmount: cloudAmount)
+                    } else {
+                        log.error("Didn't find CloudAmount for value \(stringAmount)")
+                        throw ExtractError.enumElementNotFound(fieldName: "cloudLayers.amount", elementValue: stringAmount)
+                    }
+                }
+            }
         }
 
         func extractTemperature(_ propertyField: PropertyField.Temperature) throws -> TemperatureDegrees? {
@@ -217,21 +142,47 @@ struct ObservationsExtractor {
             return nil
         }
 
+        // Build Model
         return Observation(timestamp: try timeStamp,
                            temperature: try extractTemperature(.temperature)!,
                            windChill: try extractTemperature(.windChill),
                            heatIndex: try extractTemperature(.heatIndex),
-                           textDescription: try extractString(.textDescription),
+                           textDescription: try propertyNode.extractString(.textDescription),
                            dewPoint: try extractTemperature(.dewpoint)!,
                            wind: wind,
-                           barometricPressure: try extractIntValue(.barometricPressure),
-                           visibility: try extractIntValue(.visibility),
-                           relativeHumidity: try extractIntValue(.relativeHumidity))
+                           barometricPressure: try propertyNode.extractIntValue(.barometricPressure),
+                           visibility: try propertyNode.extractIntValue(.visibility),
+                           relativeHumidity: try propertyNode.extractIntValue(.relativeHumidity),
+                           cloudLayers: try cloudLayers)
 
+    }
+
+    //MARK: - noaaURLS
+
+    /**
+     Extract out `NOAAURLS` from a JSON Payload
+     - parameter from: The JSON to extract out `NOAAURLS` from
+     - returns: URL's for various API calls for a given location
+     - throws parseFailed: If the JSON does not contain expected elements
+     */
+    static func noaaURLS(from json: JSON) throws -> NOAAURLS {
+        let propertyField = "properties"
+        let stationField = "observationStations"
+
+        guard let properties = json[propertyField] as? JSON else {
+            throw FetchError.parseFailed(field: propertyField)
+        }
+
+        if let observationStations = properties[stationField] as? String {
+            return NOAAURLS(observationStations: observationStations)
+        }
+
+        throw FetchError.parseFailed(field: stationField)
     }
 
 }
 
+// MARK: - JSON
 private extension JSON {
     /**
      Extract a temperature from a temperature node.
@@ -251,9 +202,61 @@ private extension JSON {
         }
     }
 
+    func extractIntValue(_ field: PropertyField) throws -> Int {
+        return try extractValue(field.rawValue)
+    }
+
+    func extractFloatValue(_ field: PropertyField) throws -> Float {
+        return try extractValue(field.rawValue)
+    }
+
+    func extractString(_ propertyField: PropertyField) throws -> String {
+        try string(propertyField.rawValue)
+    }
+
     func extractValue<Value: SignedNumeric>(_ parentNode: String,
                                             valueNodeName: String = "value") throws -> Value {
         let fieldNode = try self.json(parentNode)
         return try fieldNode.extract(valueNodeName)
+    }
+}
+
+// MARK: - Payload Properties
+
+/**
+ Properties from the Observation Payload
+ */
+private enum PropertyField: String {
+    case timestamp
+    case textDescription
+    case windDirection
+    case windSpeed
+    case windGust
+    case barometricPressure
+    case visibility
+    case relativeHumidity
+    case cloudLayers
+    enum Temperature: String {
+        case temperature
+        case windChill
+        case heatIndex
+        case dewpoint
+        var required: Bool {
+            switch self {
+            case .temperature, .dewpoint:
+                return true
+            default:
+                return false
+            }
+        }
+    }
+
+    var required: Bool {
+        switch self {
+        case .windGust:
+            return false
+        default:
+            return true
+        }
     }
 }

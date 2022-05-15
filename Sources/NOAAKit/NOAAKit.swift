@@ -3,22 +3,6 @@ import CoreLocation
 import Foundation
 import os
 
-/// Error that can happen when fetching weather
-public enum FetchError: Error {
-    /// The status code indicated that the call was unsuccessful
-    /// - parameter code: The code other than 200 that was returned
-    case statusCode(code: Int)
-    /// Unable to parse the response. The code possibly makes incorrect assumptions about the data model
-    case parseFailed(field: String)
-    /// Failed to convert data to the expected type
-    case conversion
-    /// The Station ID is needed for current conditions. Possible invalid coordinates
-    case stationIdentifierNotFound
-    /// The data can't be converted into JSON
-    case dataIsNotJSON
-    case responseIsNotHTTP
-}
-
 @available(macOS 12, *)
 @available(iOS 15, *)
 
@@ -28,6 +12,7 @@ public protocol NOAAFetching {
      Fetch weather for a given coordinate
      - parameter atCoordinate: The coordinate to get weather for
      - returns: Weather for the given location
+     - throws `FetchError`: Thrown weather could not be fetched
      */
     func fetchWeather(atCoordinate coordinate: CLLocationCoordinate2D) async throws -> Weather
 }
@@ -35,9 +20,14 @@ public protocol NOAAFetching {
 /**
  Provides weather data from the National Weather Service
  */
-public class NOAA: NOAAFetching {
-    private let dateFormatter = ISO8601DateFormatter()
+public final class NOAA: NOAAFetching {
     private let log = LogContext.noaaKit.logger
+
+    private lazy var noaaAPI: NOAAAPIType = {
+        NOAAAPI()
+    }()
+
+    //MARK: - Public Interface
 
     /// Creates a new ``NOAA``
     public init() {}
@@ -64,8 +54,9 @@ public class NOAA: NOAAFetching {
      */
     public func fetchWeather(atCoordinate coordinate: CLLocationCoordinate2D) async throws -> Weather {
         log.debug("fetchPoints")
-        let noaaURLS = try await coordinate.fetchPoints()
+        let pointsJSON = try await noaaAPI.json(from: .points(coordinate: coordinate))
         log.debug("Points fetched")
+        let noaaURLS = try Extract.noaaURLS(from: pointsJSON)
 
         guard let observationURL = URL(string: noaaURLS.observationStations) else {
             log.error("parseFailed: observationStations")
@@ -73,9 +64,9 @@ public class NOAA: NOAAFetching {
         }
 
         log.debug("observationURL: \(observationURL.absoluteString)")
+        let observationJSON = try await noaaAPI.json(from: .observations(url: observationURL))
         log.debug("Extracting observations")
-
-        let observations = try await ObservationsExtractor(observationStationURL: observationURL).extract()
+        let observations = try await Extract.observation(from: observationJSON)
 
         log.debug("observations extracted")
 
@@ -83,18 +74,20 @@ public class NOAA: NOAAFetching {
     }
 }
 
-private extension CLLocationCoordinate2D {
-    func fetchPoints() async throws -> NOAAURLS {
-        let json = try await pointsRequest.fetchJSON()
-
-        guard let properties = json["properties"] as? JSON else {
-            throw FetchError.parseFailed(field: "properties")
-        }
-
-        if let observationStations = properties["observationStations"] as? String {
-            return NOAAURLS(observationStations: observationStations)
-        }
-
-        throw FetchError.parseFailed(field: "observationStations")
-    }
+/// Error that can happen when fetching weather
+public enum FetchError: Error {
+    /// The status code indicated that the call was unsuccessful
+    /// - parameter code: The code other than 200 that was returned
+    case statusCode(code: Int)
+    /// Unable to parse the response. The code possibly makes incorrect assumptions about the data model
+    case parseFailed(field: String)
+    /// Failed to convert data to the expected type
+    case conversion
+    /// The Station ID is needed for current conditions. Possible invalid coordinates
+    case stationIdentifierNotFound
+    /// The data can't be converted into JSON
+    case dataIsNotJSON
+    /// The response from a call was not a HTTP response.
+    /// This is highly unexpected
+    case responseIsNotHTTP
 }

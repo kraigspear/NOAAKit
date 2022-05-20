@@ -1,6 +1,78 @@
 
-import Foundation
 import CoreLocation
+import Foundation
+import os
+
+@available(macOS 12, *)
+@available(iOS 15, *)
+
+/// Fetch weather at a given location
+public protocol NOAAFetching {
+    /**
+     Fetch weather for a given coordinate
+     - parameter atCoordinate: The coordinate to get weather for
+     - returns: Weather for the given location
+     - throws `FetchError`: Thrown weather could not be fetched
+     */
+    func fetchWeather(atCoordinate coordinate: CLLocationCoordinate2D) async throws -> Weather
+}
+
+/**
+ Provides weather data from the National Weather Service
+ */
+public final class NOAA: NOAAFetching {
+    private let log = LogContext.noaaKit.logger
+
+    private lazy var noaaAPI: NOAAAPIType = {
+        NOAAAPI()
+    }()
+
+    //MARK: - Public Interface
+
+    /// Creates a new ``NOAA``
+    public init() {}
+
+    /**
+     Fetch the location with weather for the ``Coordinate`` that was passed in.
+
+     Calling this function will return the latest weather information for the given coordinate.
+     If there is a problem either with the network or parsing a ``FetchError`` is thrown.
+
+     - parameter atCoordinate: The coordinate of the location to get weather
+     - Returns: A ``WeatherLocation`` containing the weather for this location
+     - Throws: ``FetchError`` If there was a problem retrieving the latest weather information from NOAA
+
+     ```swift
+     do {
+         if let weather = try await noaa.fetchWeather(atCoordinate: coordinate).weather {
+             self.temperature = "\(weather.current.temperature.actual)"
+         }
+     } catch {
+         print("Error: \(error)")
+     }
+     ```
+     */
+    public func fetchWeather(atCoordinate coordinate: CLLocationCoordinate2D) async throws -> Weather {
+        log.debug("fetchPoints")
+        let pointsJSON = try await noaaAPI.json(from: .points(coordinate: coordinate))
+        log.debug("Points fetched")
+        let noaaURLS = try Extract.noaaURLS(from: pointsJSON)
+
+        guard let observationURL = URL(string: noaaURLS.observationStations) else {
+            log.error("parseFailed: observationStations")
+            throw FetchError.parseFailed(field: "observationStations")
+        }
+
+        log.debug("observationURL: \(observationURL.absoluteString)")
+        let observationJSON = try await noaaAPI.json(from: .observations(url: observationURL))
+        log.debug("Extracting observations")
+        let observations = try await Extract.observation(from: observationJSON)
+
+        log.debug("observations extracted")
+
+        return Weather(observations: observations)
+    }
+}
 
 /// Error that can happen when fetching weather
 public enum FetchError: Error {
@@ -8,59 +80,14 @@ public enum FetchError: Error {
     /// - parameter code: The code other than 200 that was returned
     case statusCode(code: Int)
     /// Unable to parse the response. The code possibly makes incorrect assumptions about the data model
-    case parseFailed
-    ///
+    case parseFailed(field: String)
+    /// Failed to convert data to the expected type
     case conversion
-}
-
-@available(macOS 12, *)
-@available(iOS 15, *)
-/**
-
- */
-public class NOAA {
-
-    private let currentConditionsExtractor: CurrentConditionsExtractable
-
-    public init() {
-        self.currentConditionsExtractor = CurrentConditionExtractor()
-    }
-
-    init(currentConditionsExtractor: CurrentConditionsExtractable) {
-        self.currentConditionsExtractor = currentConditionsExtractor
-    }
-
-    public func fetchWeather(atCoordinate coordinate: CLLocationCoordinate2D) async throws -> WeatherLocation {
-
-        let request = coordinate.currentObservationRequest
-        let (data, response) = try await URLSession.shared.data(for: request)
-        guard let httpURLResponse = response as? HTTPURLResponse else {
-             preconditionFailure("Unexpected to not receive a HTTPURLResponse")
-        }
-
-        guard httpURLResponse.statusCode == 200 else { throw FetchError.statusCode(code: httpURLResponse.statusCode)}
-
-        guard let noaaForecast = try? JSONDecoder().decode(NOAAModel.Forecast.self, from: data) else {
-            throw FetchError.parseFailed
-        }
-
-        let current = try currentConditionsExtractor.extract(noaaForecast.currentObservation)
-
-        let weather = Weather(current: current)
-
-        return WeatherLocation(
-            coordinate: Coordinate(coordinate),
-            weather: weather)
-
-    }
-}
-
-private extension CLLocationCoordinate2D {
-    var currentObservationRequest: URLRequest {
-        let urlStr = "https://forecast.weather.gov/MapClick.php?lat=\(latitude)&lon=\(longitude)&unit=0&lg=english&FcstType=json"
-        let url = URL(string: urlStr)!
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        return request
-    }
+    /// The Station ID is needed for current conditions. Possible invalid coordinates
+    case stationIdentifierNotFound
+    /// The data can't be converted into JSON
+    case dataIsNotJSON
+    /// The response from a call was not a HTTP response.
+    /// This is highly unexpected
+    case responseIsNotHTTP
 }
